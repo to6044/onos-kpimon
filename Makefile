@@ -1,111 +1,76 @@
-# SPDX-FileCopyrightText: 2021 Open Networking Foundation <info@opennetworking.org>
-# Copyright 2019 free5GC.org
+# SPDX-FileCopyrightText: 2019-present Open Networking Foundation <info@opennetworking.org>
 #
 # SPDX-License-Identifier: Apache-2.0
-#
-#
 
-PROJECT_NAME             := sdran
-DOCKER_VERSION           ?= $(shell cat ./VERSION)
+export CGO_ENABLED=1
+export GO111MODULE=on
 
-## Docker related
-DOCKER_REGISTRY          ?=
-DOCKER_REPOSITORY        ?=
-DOCKER_TAG               ?= ${DOCKER_VERSION}
-DOCKER_IMAGENAME         := ${DOCKER_REGISTRY}${DOCKER_REPOSITORY}${PROJECT_NAME}:${DOCKER_TAG}
-DOCKER_BUILDKIT          ?= 1
-DOCKER_BUILD_ARGS        ?=
+.PHONY: build
 
-## Docker labels. Only set ref and commit date if committed
-DOCKER_LABEL_VCS_URL     ?= $(shell git remote get-url $(shell git remote))
-DOCKER_LABEL_VCS_REF     ?= $(shell git diff-index --quiet HEAD -- && git rev-parse HEAD || echo "unknown")
-DOCKER_LABEL_COMMIT_DATE ?= $(shell git diff-index --quiet HEAD -- && git show -s --format=%cd --date=iso-strict HEAD || echo "unknown" )
-DOCKER_LABEL_BUILD_DATE  ?= $(shell date -u "+%Y-%m-%dT%H:%M:%SZ")
+ONOS_KPIMON_VERSION := latest
+ONOS_PROTOC_VERSION := v0.6.6
+BUF_VERSION := 0.27.1
 
-DOCKER_TARGETS           ?= kpimon
+build: # @HELP build the Go binaries and run all validations (default)
+build:
+	GOPRIVATE="github.com/onosproject/*" go build -o build/_output/onos-kpimon ./cmd/onos-kpimon
 
-GO_BIN_PATH = bin
-GO_SRC_PATH = ./
-C_BUILD_PATH = build
-ROOT_PATH = $(shell pwd)
+build-tools:=$(shell if [ ! -d "./build/build-tools" ]; then cd build && git clone https://github.com/onosproject/build-tools.git; fi)
+include ./build/build-tools/make/onf-common.mk
 
-NF = $(GO_NF)
-GO_NF = kpimon
+test: # @HELP run the unit tests and source code validation
+test: build deps linters license
+	go test -race github.com/onosproject/onos-kpimon/pkg/...
+	go test -race github.com/onosproject/onos-kpimon/cmd/...
 
-NF_GO_FILES = $(shell find $(GO_SRC_PATH)/$(%) -name "*.go" ! -name "*_test.go")
-NF_GO_FILES_ALL = $(shell find $(GO_SRC_PATH)/$(%) -name "*.go")
+jenkins-test:  # @HELP run the unit tests and source code validation producing a junit style report for Jenkins
+jenkins-test: deps license linters
+	TEST_PACKAGES=github.com/onosproject/onos-kpimon/... ./build/build-tools/build/jenkins/make-unit
 
-VERSION = $(shell git describe --tags)
-BUILD_TIME = $(shell date -u +"%Y-%m-%dT%H:%M:%SZ")
-COMMIT_HASH = $(shell git submodule status | grep $(GO_SRC_PATH)/$(@F) | awk '{print $$(1)}' | cut -c1-8)
-COMMIT_TIME = $(shell cd $(GO_SRC_PATH) && git log --pretty="%ai" -1 | awk '{time=$$(1)"T"$$(2)"Z"; print time}')
+buflint: #@HELP run the "buf check lint" command on the proto files in 'api'
+	docker run -it -v `pwd`:/go/src/github.com/onosproject/onos-kpimon \
+		-w /go/src/github.com/onosproject/onos-kpimon/api \
+		bufbuild/buf:${BUF_VERSION} check lint
 
-.PHONY: $(NF) clean docker-build docker-push
+protos: # @HELP compile the protobuf files (using protoc-go Docker)
+protos:
+	docker run -it -v `pwd`:/go/src/github.com/onosproject/onos-kpimon \
+		-w /go/src/github.com/onosproject/onos-kpimon \
+		--entrypoint build/bin/compile-protos.sh \
+		onosproject/protoc-go:${ONOS_PROTOC_VERSION}
 
-.DEFAULT_GOAL: nfs
+helmit-kpm: integration-test-namespace # @HELP run MHO tests locally
+	helmit test -n test ./cmd/onos-kpimon-test --timeout 30m --no-teardown --suite kpm
 
-nfs: $(NF)
+helmit-ha: integration-test-namespace # @HELP run MHO HA tests locally
+	helmit test -n test ./cmd/onos-kpimon-test --timeout 30m --no-teardown --suite ha
 
-all: $(NF)
+integration-tests: helmit-kpm helmit-ha # @HELP run all MHO integration tests locally
 
-$(GO_NF): % : $(GO_BIN_PATH)/%
-
-$(GO_BIN_PATH)/%: %.go $(NF_GO_FILES)
-# $(@F): The file-within-directory part of the file name of the target.
-	@echo "Start building $(@F)...."
-	cd $(GO_SRC_PATH)/ && \
-	CGO_ENABLED=0 go build -o $(ROOT_PATH)/$@ $(@F).go
-
-vpath %.go $(addprefix $(GO_SRC_PATH)/, $(GO_NF))
-
-#test: $(NF_GO_FILES_ALL)
-#	@echo "Start building $(@F)...."
-#	cd $(GO_SRC_PATH)/ && \
-#	CGO_ENABLED=0 go test -o $(ROOT_PATH)/$@
-
-clean:
-	rm -rf $(addprefix $(GO_BIN_PATH)/, $(GO_NF))
-	rm -rf $(addprefix $(GO_SRC_PATH)/, $(addsuffix /$(C_BUILD_PATH), $(C_NF)))
-
-docker-build:
+onos-kpimon-docker: # @HELP build onos-kpimon Docker image
+onos-kpimon-docker:
 	@go mod vendor
-	for target in $(DOCKER_TARGETS); do \
-		DOCKER_BUILDKIT=$(DOCKER_BUILDKIT) docker build  $(DOCKER_BUILD_ARGS) \
-			--target $$target \
-			--tag ${DOCKER_REGISTRY}${DOCKER_REPOSITORY}5gc-$$target:${DOCKER_TAG} \
-			--build-arg org_label_schema_version="${DOCKER_VERSION}" \
-			--build-arg org_label_schema_vcs_url="${DOCKER_LABEL_VCS_URL}" \
-			--build-arg org_label_schema_vcs_ref="${DOCKER_LABEL_VCS_REF}" \
-			--build-arg org_label_schema_build_date="${DOCKER_LABEL_BUILD_DATE}" \
-			--build-arg org_opencord_vcs_commit_date="${DOCKER_LABEL_COMMIT_DATE}" \
-			. \
-			|| exit 1; \
-	done
-	rm -rf vendor
+	docker build . -f build/onos-kpimon/Dockerfile \
+		-t onosproject/onos-kpimon:${ONOS_KPIMON_VERSION}
+	@rm -rf vendor
 
-docker-push:
-	for target in $(DOCKER_TARGETS); do \
-		docker push ${DOCKER_REGISTRY}${DOCKER_REPOSITORY}5gc-$$target:${DOCKER_TAG}; \
-	done
+images: # @HELP build all Docker images
+images: build onos-kpimon-docker
 
-.coverage:
-	rm -rf $(CURDIR)/.coverage
-	mkdir -p $(CURDIR)/.coverage
+kind: # @HELP build Docker images and add them to the currently configured kind cluster
+kind: images
+	@if [ "`kind get clusters`" = '' ]; then echo "no kind cluster found" && exit 1; fi
+	kind load docker-image onosproject/onos-kpimon:${ONOS_KPIMON_VERSION}
 
-test: .coverage
-	docker run --rm -v $(CURDIR):/kpimon -w /kpimon golang:latest \
-		go test \
-			-failfast \
-			-coverprofile=.coverage/coverage-unit.txt \
-			-covermode=atomic \
-			-v \
-			./ ./...
+all: build images
 
-fmt:
-	@go fmt ./...
+publish: # @HELP publish version on github and dockerhub
+	./build/build-tools/publish-version ${VERSION} onosproject/onos-kpimon
 
-golint:
-	@docker run --rm -v $(CURDIR):/app -w /app golangci/golangci-lint:latest golangci-lint run -v --config /app/.golangci.yml
+jenkins-publish: jenkins-tools # @HELP Jenkins calls this to publish artifacts
+	./build/bin/push-images
+	./build/build-tools/release-merge-commit
 
-check-reuse:
-	@docker run --rm -v $(CURDIR):/kpimon -w /kpimon onosproject/reuse-verify:latest reuse lint
+clean:: # @HELP remove all the build artifacts
+	rm -rf ./build/_output ./vendor ./cmd/onos-kpimon/onos-kpimon ./cmd/onos/onos
+	go clean -testcache github.com/onosproject/onos-kpimon/...

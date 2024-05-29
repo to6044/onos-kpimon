@@ -5,7 +5,7 @@ name: GitHub release and Docker images
 on:
   push:
     branches:
-      - master
+      - action_test
     tags:
       - v*
 

@@ -1,3 +1,5 @@
 # action test
 
 - Push
+- Push 2차
+  - Docker Secrets 추가

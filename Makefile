@@ -7,7 +7,7 @@ export GO111MODULE=on
 
 .PHONY: build
 
-ONOS_KPIMON_VERSION := latest
+ONOS_KPIMON_VERSION := ${DOCKER_TAG}
 ONOS_PROTOC_VERSION := v0.6.6
 BUF_VERSION := 0.27.1
 
@@ -51,7 +51,7 @@ onos-kpimon-docker: # @HELP build onos-kpimon Docker image
 onos-kpimon-docker:
 	@go mod vendor
 	docker build . -f build/onos-kpimon/Dockerfile \
-		-t onosproject/onos-kpimon:${ONOS_KPIMON_VERSION}
+		-t khusdran/onos-kpimon:${ONOS_KPIMON_VERSION}
 	@rm -rf vendor
 
 images: # @HELP build all Docker images
@@ -74,3 +74,6 @@ jenkins-publish: jenkins-tools # @HELP Jenkins calls this to publish artifacts
 clean:: # @HELP remove all the build artifacts
 	rm -rf ./build/_output ./vendor ./cmd/onos-kpimon/onos-kpimon ./cmd/onos/onos
 	go clean -testcache github.com/onosproject/onos-kpimon/...
+
+mcl_publish:
+	echo "$DOCKER_PASSWORD" | docker login -u "$DOCKER_USERNAME" --password-stdin

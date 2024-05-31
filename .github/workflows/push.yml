@@ -12,7 +12,7 @@ on:
 jobs:
   push-images:  # 도커 이미지 푸시, omec-project/amf에는 master-latest와 GIT_SHA두가지 버전
     runs-on: ubuntu-latest
-    if: github.repository_owner == 'sodyn99'  # 레포지토리 user
+    if: github.repository_owner == 'khu-mcl'  # 레포지토리 user
     env:
       REGISTRY: docker.io # 도커 레지스트리: '/' 있으면 안됨
       DOCKER_REGISTRY: docker.io
@@ -45,7 +45,7 @@ jobs:
   # CAUTION: Other actions depend on this name "tag-github"
   tag-github:
     runs-on: ubuntu-latest
-    if: github.repository_owner == 'sodyn99'
+    if: github.repository_owner == 'khu-mcl'
     outputs:
       changed: ${{ steps.version-change.outputs.changed }}  # VERSION 파일이 바꼈는지
       version: ${{ steps.version-change.outputs.version }}  # VERSION 파일 내용

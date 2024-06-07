@@ -21,15 +21,22 @@ include ./build/build-tools/make/onf-common.mk
 
 
 
-target-docker: # @HELP build onos-kpimon Docker image
+# kpimon-docker: # @HELP build onos-kpimon Docker image
+# kpimon-docker:
+# 	@go mod vendor
+# 	docker build . -f build/onos-kpimon/Dockerfile \
+# 		-t khusdran/onos-kpimon:${ONOS_KPIMON_VERSION}
+# 	@rm -rf vendor
+
+target-docker: # @HELP build target Docker image
 target-docker:
 	@go mod vendor
-	docker build . -f build/onos-kpimon/Dockerfile \
-		-t khusdran/onos-kpimon:${ONOS_KPIMON_VERSION}
+	docker build . -f build/${TARGET}/Dockerfile \
+		-t ${DOCKER_REPOSITORY}${TARGET}:${TARGET_VERSION}
 	@rm -rf vendor
 
 images: # @HELP build all Docker images
-images: build onos-kpimon-docker
+images: build target-docker
 
 docker-push:
 	docker push ${DOCKER_REPOSITORY}${TARGET}:${DOCKER_TAG}

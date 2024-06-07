@@ -12,7 +12,7 @@ on:
 jobs:
   push-images:  
     runs-on: ubuntu-latest
-    if: github.repository_owner == 'khu-mcl'  
+    if: github.repository_owner == 'to6044'  
     env:
       REGISTRY: docker.io
       DOCKER_REPOSITORY: khusdran
@@ -47,7 +47,7 @@ jobs:
   # CAUTION: Other actions depend on this name "tag-github"
   tag-github:
     runs-on: ubuntu-latest
-    if: github.repository_owner == 'khu-mcl'
+    if: github.repository_owner == 'to6044'
     outputs:
       changed: ${{ steps.version-change.outputs.changed }}  
       version: ${{ steps.version-change.outputs.version }}  

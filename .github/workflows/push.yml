@@ -143,7 +143,7 @@ jobs:
           git clone https://github.com/onosproject/build-tools.git build/build-tools
           make images
           make docker-push     
-#docker.io/onosproject/onos-kpimon:latest 이렇게 됨
+
 
   update-version:
     runs-on: ubuntu-latest

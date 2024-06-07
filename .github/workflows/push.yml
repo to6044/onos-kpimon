@@ -15,7 +15,7 @@ jobs:
     if: github.repository_owner == 'to6044'  
     env:
       REGISTRY: docker.io
-      DOCKER_REPOSITORY: khusdran
+      DOCKER_REPOSITORY: hssdran
     steps:
       - uses: actions/checkout@v4
         with:

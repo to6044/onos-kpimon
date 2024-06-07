@@ -7,7 +7,8 @@ export GO111MODULE=on
 
 .PHONY: build
 
-ONOS_KPIMON_VERSION := ${DOCKER_TAG}
+TARGET := onos-kpimon
+TARGET_VERSION := ${DOCKER_TAG}
 ONOS_PROTOC_VERSION := v0.6.6
 BUF_VERSION := 0.27.1
 
@@ -20,8 +21,8 @@ include ./build/build-tools/make/onf-common.mk
 
 
 
-onos-kpimon-docker: # @HELP build onos-kpimon Docker image
-onos-kpimon-docker:
+target-docker: # @HELP build onos-kpimon Docker image
+target-docker:
 	@go mod vendor
 	docker build . -f build/onos-kpimon/Dockerfile \
 		-t khusdran/onos-kpimon:${ONOS_KPIMON_VERSION}
@@ -29,6 +30,9 @@ onos-kpimon-docker:
 
 images: # @HELP build all Docker images
 images: build onos-kpimon-docker
+
+docker-push:
+	docker push ${DOCKER_REPOSITORY}${TARGET}:${DOCKER_TAG}
 
 kind: # @HELP build Docker images and add them to the currently configured kind cluster
 kind: images
